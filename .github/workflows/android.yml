@@ -35,13 +35,13 @@ jobs:
           test -f HikariAI-Android-Project.zip || { echo "Архив не найден в корне репозитория"; exit 1; }
           mkdir -p project
           unzip -o HikariAI-Android-Project.zip -d project
-          find project -maxdepth 2 -name "build.gradle*" -o -maxdepth 2 -name "settings.gradle*"
+          find project -maxdepth 2 -name "build.gradle*"
           cp -R project/. .
 
       - name: Fix JVM target
         run: |
-          find . $ -name "build.gradle" -o -name "build.gradle.kts" $ -type f -print
-          find . $ -name "build.gradle" -o -name "build.gradle.kts" $ -type f -exec sed -i \
+          find . -name "build.gradle*" -type f -print
+          find . -name "build.gradle*" -type f -exec sed -i \
             -e 's/VERSION_1_8/VERSION_17/g' \
             -e 's/JVM_1_8/JVM_17/g' \
             -e "s/jvmTarget = ['\"]1\.8['\"]/jvmTarget = \"17\"/g" \
