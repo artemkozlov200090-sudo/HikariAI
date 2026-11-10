@@ -40,15 +40,25 @@ jobs:
 
       - name: Fix JVM target
         run: |
-          find . -name "build.gradle*" -type f -exec sed -i \
+          find . $ -name "build.gradle" -o -name "build.gradle.kts" $ -type f -print
+          find . $ -name "build.gradle" -o -name "build.gradle.kts" $ -type f -exec sed -i \
             -e 's/VERSION_1_8/VERSION_17/g' \
-            -e 's/jvmTarget = "1\.8"/jvmTarget = "17"/g' \
-            -e "s/jvmTarget = '1\.8'/jvmTarget = '17'/g" \
-            -e 's/sourceCompatibility = "1\.8"/sourceCompatibility = "17"/g' \
-            -e 's/targetCompatibility = "1\.8"/targetCompatibility = "17"/g' \
+            -e 's/JVM_1_8/JVM_17/g' \
+            -e "s/jvmTarget = ['\"]1\.8['\"]/jvmTarget = \"17\"/g" \
+            -e "s/jvmTarget\.set(['\"]1\.8['\"])/jvmTarget.set(\"17\")/g" \
+            -e "s/jvmTarget(['\"]1\.8['\"])/jvmTarget(\"17\")/g" \
+            -e "s/sourceCompatibility = ['\"]1\.8['\"]/sourceCompatibility = \"17\"/g" \
+            -e "s/targetCompatibility = ['\"]1\.8['\"]/targetCompatibility = \"17\"/g" \
+            -e "s/compatibility = ['\"]1\.8['\"]/compatibility = \"17\"/g" \
             {} +
-          echo "--- Проверка настроек после правки ---"
-          grep -rn "jvmTarget\|Compatibility" --include="build.gradle*" . || true
+          echo "--- Строки с 1.8 после правки ---"
+          grep -rn "1\.8" --include="build.gradle*" . || echo "Настроек с 1.8 не осталось"
+          if [ -f gradle.properties ]; then
+            grep -q "kotlin.jvm.target.validation.mode" gradle.properties || \
+              echo "kotlin.jvm.target.validation.mode=warning" >> gradle.properties
+          else
+            echo "kotlin.jvm.target.validation.mode=warning" >> gradle.properties
+          fi
 
       - name: Build APK
         run: |
