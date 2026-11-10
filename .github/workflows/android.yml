@@ -38,6 +38,18 @@ jobs:
           find project -maxdepth 2 -name "build.gradle*" -o -maxdepth 2 -name "settings.gradle*"
           cp -R project/. .
 
+      - name: Fix JVM target
+        run: |
+          find . -name "build.gradle*" -type f -exec sed -i \
+            -e 's/VERSION_1_8/VERSION_17/g' \
+            -e 's/jvmTarget = "1\.8"/jvmTarget = "17"/g' \
+            -e "s/jvmTarget = '1\.8'/jvmTarget = '17'/g" \
+            -e 's/sourceCompatibility = "1\.8"/sourceCompatibility = "17"/g' \
+            -e 's/targetCompatibility = "1\.8"/targetCompatibility = "17"/g' \
+            {} +
+          echo "--- Проверка настроек после правки ---"
+          grep -rn "jvmTarget\|Compatibility" --include="build.gradle*" . || true
+
       - name: Build APK
         run: |
           GRADLEW=$(find . -name "gradlew" -type f | head -n 1)
