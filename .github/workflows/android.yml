@@ -1,11 +1,9 @@
-
 name: Build Hikari AI APK
 
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [ main ]
 
 jobs:
   build:
@@ -14,33 +12,36 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
+      - name: Set up Java
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Android SDK
+      - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
           packages: 'platform-tools'
 
-      - name: Setup Gradle
+      - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
       - name: Extract project
         run: |
-          mkdir project
+          ls -la
+          test -f HikariAI-Android-Project.zip || { echo "Архив не найден в корне репозитория"; exit 1; }
+          mkdir -p project
           unzip -o HikariAI-Android-Project.zip -d project
+          find project -maxdepth 2 -name "build.gradle*" -o -maxdepth 2 -name "settings.gradle*"
           cp -R project/. .
 
       - name: Build APK
-        run: gradle assembleDebug
+        run: gradle assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Hikari-AI-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: '**/build/outputs/apk/debug/*.apk'
