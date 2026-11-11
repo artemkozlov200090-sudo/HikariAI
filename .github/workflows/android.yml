@@ -14,9 +14,11 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Unzip project archive
-        run: unzip -o HikariAI-Android-Project.zip -d unpacked
+        run: |
+          unzip -o HikariAI-Android-Project.zip -d unpacked
+          echo "=== Файлы в распакованной папке ==="
+          find unpacked -maxdepth 3
 
-      # Создаём Constants.kt с ключом в нужной папке и с нужным пакетом
       - name: Create Constants.kt with API Key
         run: |
           mkdir -p unpacked/app/src/main/java/ai/hikari/app
@@ -25,7 +27,7 @@ jobs:
 
           object Constants {
               const val BASE_URL = "https://openrouter.ai/api/v1"
-              const val API_KEY = "${{ secrets.OPENROUTER_API_KEY }}"
+              const val API_KEY = "\${{ secrets.OPENROUTER_API_KEY }}"
           }
           EOF
           cat unpacked/app/src/main/java/ai/hikari/app/Constants.kt
@@ -36,7 +38,11 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      # Ставим Gradle, раз в архиве нет gradlew
+      - name: Show Java & Gradle versions
+        run: |
+          java -version
+          gradle --version
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -45,6 +51,7 @@ jobs:
       - name: Build Debug APK
         run: |
           cd unpacked
+          # Если в корне есть settings.gradle.kts — сборка пойдёт оттуда
           gradle assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK
