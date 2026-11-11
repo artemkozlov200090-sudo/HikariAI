@@ -38,20 +38,14 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Show Java & Gradle versions
-        run: |
-          java -version
-          gradle --version
-
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.7'
+          gradle-version: '8.9'
 
       - name: Build Debug APK
         run: |
           cd unpacked
-          # Если в корне есть settings.gradle.kts — сборка пойдёт оттуда
           gradle assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK
