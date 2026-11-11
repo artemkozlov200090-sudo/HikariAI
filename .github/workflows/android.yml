@@ -1,78 +1,61 @@
 name: Build Hikari AI APK
 
 on:
-  workflow_dispatch:
   push:
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Скачиваем репозиторий
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Java
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          packages: 'platform-tools'
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.9'
-
-      - name: Extract project
+      # 2. Распаковываем ZIP с исходниками проекта
+      - name: Unzip project archive
         run: |
           ls -la
-          test -f HikariAI-Android-Project.zip || { echo "Архив не найден в корне репозитория"; exit 1; }
-          mkdir -p project
-          unzip -o HikariAI-Android-Project.zip -d project
-          find project -maxdepth 2 -name "build.gradle*"
-          cp -R project/. .
+          # распаковываем архив в корень репозитория
+          unzip -o HikariAI-Android-Project.zip -d .
+          # если внутри архива была своя папка — поднимаем её содержимое выше
+          inner=$(find . -maxdepth 2 -type d -name app | head -n 1)
+          echo "Найдена папка app: $inner"
 
-      - name: Fix JVM target
+      # 3. Создаём Constants.kt с ключом OpenRouter
+      - name: Create Constants.kt with API Key
         run: |
-          find . -name "build.gradle*" -type f -print
-          find . -name "build.gradle*" -type f -exec sed -i \
-            -e 's/VERSION_1_8/VERSION_17/g' \
-            -e 's/JVM_1_8/JVM_17/g' \
-            -e "s/jvmTarget = ['\"]1\.8['\"]/jvmTarget = \"17\"/g" \
-            -e "s/jvmTarget\.set(['\"]1\.8['\"])/jvmTarget.set(\"17\")/g" \
-            -e "s/jvmTarget(['\"]1\.8['\"])/jvmTarget(\"17\")/g" \
-            -e "s/sourceCompatibility = ['\"]1\.8['\"]/sourceCompatibility = \"17\"/g" \
-            -e "s/targetCompatibility = ['\"]1\.8['\"]/targetCompatibility = \"17\"/g" \
-            -e "s/compatibility = ['\"]1\.8['\"]/compatibility = \"17\"/g" \
-            {} +
-          echo "--- Строки с 1.8 после правки ---"
-          grep -rn "1\.8" --include="build.gradle*" . || echo "Настроек с 1.8 не осталось"
-          if [ -f gradle.properties ]; then
-            grep -q "kotlin.jvm.target.validation.mode" gradle.properties || \
-              echo "kotlin.jvm.target.validation.mode=warning" >> gradle.properties
-          else
-            echo "kotlin.jvm.target.validation.mode=warning" >> gradle.properties
-          fi
+          # находим папку с исходниками, куда бы она ни легла после распаковки
+          pkg_dir=$(dirname $(find . -type d -path '*/java/*' | head -n 1))
+          echo "Пакет: $pkg_dir"
+          cat > "$pkg_dir/Constants.kt" <<EOF
+          object Constants {
+              const val BASE_URL = "https://openrouter.ai/api/v1"
+              const val API_KEY = "${{ secrets.OPENROUTER_API_KEY }}"
+          }
+          EOF
+          cat "$pkg_dir/Constants.kt"
 
-      - name: Build APK
-        run: |
-          GRADLEW=$(find . -name "gradlew" -type f | head -n 1)
-          if [ -n "$GRADLEW" ]; then
-            chmod +x "$GRADLEW"
-            "$(dirname "$GRADLEW")/gradlew" -p "$(dirname "$GRADLEW")" assembleDebug --stacktrace
-          else
-            echo "gradlew не найден, использую системный Gradle"
-            gradle assembleDebug --stacktrace
-          fi
+      # 4. Настраиваем Java
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
 
+      # 5. Даём право gradlew запускаться
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # 6. Собираем APK
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      # 7. Сохраняем APK как артефакт
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Hikari-AI-APK
-          path: '**/build/outputs/apk/debug/*.apk'
+          name: hikari-ai-apk
+          path: app/build/outputs/apk/debug/*.apk
