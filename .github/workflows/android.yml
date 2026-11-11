@@ -33,12 +33,23 @@ jobs:
           echo "=== Содержимое Constants.kt ==="
           cat unpacked/app/src/main/java/ai/hikari/app/Constants.kt
 
-      # Чиним несовпадение JVM-версий: заменяем 1.8 на 17 в файлах сборки
-      - name: Fix JVM target (1.8 -> 17)
+      # Принудительно ставим Java 17 для Java- и Kotlin-компиляторов
+      - name: Force JVM target 17
         run: |
-          sed -i 's/VERSION_1_8/VERSION_17/g; s/"1\.8"/"17"/g; s/1\.8/17/g' unpacked/app/build.gradle.kts unpacked/build.gradle.kts
-          echo "=== app/build.gradle.kts после правки ==="
-          cat unpacked/app/build.gradle.kts
+          cat >> unpacked/app/build.gradle.kts <<'EOL'
+
+          android {
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+              kotlinOptions {
+                  jvmTarget = "17"
+              }
+          }
+          EOL
+          echo "=== Конец app/build.gradle.kts ==="
+          tail -20 unpacked/app/build.gradle.kts
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
