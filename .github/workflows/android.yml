@@ -17,26 +17,39 @@ jobs:
       # 2. Распаковываем ZIP с исходниками проекта
       - name: Unzip project archive
         run: |
-          ls -la
-          # распаковываем архив в корень репозитория
-          unzip -o HikariAI-Android-Project.zip -d .
-          # если внутри архива была своя папка — поднимаем её содержимое выше
-          inner=$(find . -maxdepth 2 -type d -name app | head -n 1)
-          echo "Найдена папка app: $inner"
+          unzip -o HikariAI-Android-Project.zip -d unpacked
+          echo "=== Что распаковалось: ==="
+          find unpacked -maxdepth 3 | head -50
 
-      # 3. Создаём Constants.kt с ключом OpenRouter
-      - name: Create Constants.kt with API Key
+      # 3. Находим корень проекта (там, где gradlew) и создаём Constants.kt
+      - name: Find project root and create Constants.kt
         run: |
-          # находим папку с исходниками, куда бы она ни легла после распаковки
-          pkg_dir=$(dirname $(find . -type d -path '*/java/*' | head -n 1))
-          echo "Пакет: $pkg_dir"
-          cat > "$pkg_dir/Constants.kt" <<EOF
+          gradlew_path=$(find unpacked -name gradlew -type f | head -n 1)
+          if [ -z "$gradlew_path" ]; then
+            echo "ОШИБКА: gradlew не найден в архиве!"
+            find unpacked -type f | head -50
+            exit 1
+          fi
+          project_root=$(dirname "$gradlew_path")
+          echo "Корень проекта: $project_root"
+          echo "PROJECT_ROOT=$project_root" >> $GITHUB_ENV
+
+          # ищем папку с Kotlin-исходниками
+          src_dir=$(find "$project_root" -type d -name java | head -n 1)
+          if [ -z "$src_dir" ]; then
+            echo "ОШИБКА: папка java не найдена!"
+            exit 1
+          fi
+          echo "Исходники: $src_dir"
+
+          cat > "$src_dir/Constants.kt" <<EOF
           object Constants {
               const val BASE_URL = "https://openrouter.ai/api/v1"
               const val API_KEY = "${{ secrets.OPENROUTER_API_KEY }}"
           }
           EOF
-          cat "$pkg_dir/Constants.kt"
+          echo "=== Содержимое Constants.kt: ==="
+          cat "$src_dir/Constants.kt"
 
       # 4. Настраиваем Java
       - name: Set up JDK 17
@@ -47,15 +60,18 @@ jobs:
 
       # 5. Даём право gradlew запускаться
       - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+        run: chmod +x "$PROJECT_ROOT/gradlew"
 
       # 6. Собираем APK
       - name: Build Debug APK
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: |
+          cd "$PROJECT_ROOT"
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
 
       # 7. Сохраняем APK как артефакт
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: hikari-ai-apk
-          path: app/build/outputs/apk/debug/*.apk
+          path: unpacked/**/app/build/outputs/apk/debug/*.apk
